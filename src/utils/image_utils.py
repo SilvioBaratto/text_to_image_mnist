@@ -91,7 +91,7 @@ def unflatten_image(image: torch.Tensor) -> torch.Tensor:
         raise ValueError(f"Expected 1D or 2D tensor, got {image.shape}")
 
 
-def display_image_in_terminal(image: torch.Tensor, digit: int) -> None:
+def display_image_in_terminal(image: torch.Tensor, digit: Optional[int] = None) -> None:
     """Render generated digit as Unicode block art in terminal."""
     if image.dim() == 1:
         image_np = image.cpu().detach().numpy().reshape(28, 28)
@@ -105,7 +105,10 @@ def display_image_in_terminal(image: torch.Tensor, digit: int) -> None:
     image_np = np.power(image_np, 0.7)
 
     print(f"\n{'='*80}")
-    print(f"{'Generated Digit: ' + str(digit):^80}")
+    if digit is not None:
+        print(f"{'Generated Digit: ' + str(digit):^80}")
+    else:
+        print(f"{'Generated Image':^80}")
     print(f"{'='*80}\n")
 
     for i in range(0, 28, 2):

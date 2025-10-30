@@ -1,45 +1,59 @@
-"""Parse digit labels from natural language prompts."""
+"""Semantic text encoder using SentenceTransformer for natural language understanding."""
 
-import re
+import torch
+from sentence_transformers import SentenceTransformer
 
-NUMBER_WORDS = {
-    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4,
-    "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9
-}
+# Global model instance (loaded once)
+_text_encoder_model = None
 
 
-def parse_text_to_digit(text: str) -> int:
-    """Extract digit (0-9) from text prompt.
+def get_text_encoder_model():
+    """Load and cache the SentenceTransformer model."""
+    global _text_encoder_model
+    if _text_encoder_model is None:
+        print("Loading SentenceTransformer model (all-MiniLM-L6-v2)...")
+        _text_encoder_model = SentenceTransformer('all-MiniLM-L6-v2')
+        print("Text encoder loaded successfully!")
+    return _text_encoder_model
 
-    Supports: "Print number 3", "Generate five", "Show digit 7", "3", "three"
+
+def encode_text_to_embedding(text: str, device: str = 'cpu') -> torch.Tensor:
+    """Encode text prompt to 384-dimensional semantic embedding.
+
+    Args:
+        text: Natural language prompt (e.g., "I want to draw a zero")
+        device: Device to place tensor on ('cpu', 'cuda', 'mps')
+
+    Returns:
+        torch.Tensor: 384-dimensional embedding vector
     """
-    text_lower = text.lower().strip()
+    model = get_text_encoder_model()
 
-    for word, digit in NUMBER_WORDS.items():
-        if re.search(r'\b' + word + r'\b', text_lower):
-            return digit
+    # Encode text (returns numpy array)
+    embedding = model.encode(text, convert_to_tensor=False)
 
-    digit_match = re.search(r'\b([0-9])\b', text_lower)
-    if digit_match:
-        return int(digit_match.group(1))
+    # Convert to torch tensor and move to device
+    embedding_tensor = torch.tensor(embedding, dtype=torch.float32).to(device)
 
-    raise ValueError(
-        f"Could not extract digit from: '{text}'. "
-        f"Use patterns like 'Print number 3', 'five', or just '7'."
-    )
+    return embedding_tensor
 
 
-def digit_to_onehot(digit: int, num_classes: int = 10) -> list:
-    """Convert digit to one-hot list."""
-    if not 0 <= digit < num_classes:
-        raise ValueError(f"Digit must be in [0, {num_classes-1}], got {digit}")
+def encode_texts_batch(texts: list[str], device: str = 'cpu') -> torch.Tensor:
+    """Encode a batch of text prompts to embeddings.
 
-    onehot = [0] * num_classes
-    onehot[digit] = 1
-    return onehot
+    Args:
+        texts: List of text prompts
+        device: Device to place tensor on
 
+    Returns:
+        torch.Tensor: (batch_size, 384) embedding matrix
+    """
+    model = get_text_encoder_model()
 
-def parse_text_to_onehot(text: str, num_classes: int = 10) -> list:
-    """Parse text and return one-hot encoded label."""
-    digit = parse_text_to_digit(text)
-    return digit_to_onehot(digit, num_classes)
+    # Batch encode (more efficient)
+    embeddings = model.encode(texts, convert_to_tensor=False, show_progress_bar=False)
+
+    # Convert to torch tensor
+    embeddings_tensor = torch.tensor(embeddings, dtype=torch.float32).to(device)
+
+    return embeddings_tensor

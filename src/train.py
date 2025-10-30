@@ -10,9 +10,13 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.append('.')
+
+# Fix tokenizer multiprocessing warning
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
 import config
 from src.model.vae import CVAE, loss_function
-from src.utils.data_loader import get_mnist_dataloaders, flatten_images, labels_to_onehot
+from src.utils.data_loader import get_mnist_dataloaders, flatten_images, labels_to_text_embeddings
 from src.utils.image_utils import visualize_training_samples
 
 
@@ -36,7 +40,7 @@ def train_epoch(model, train_loader, optimizer, device, epoch, beta):
         labels = labels.to(device)
 
         x = flatten_images(images)
-        y = labels_to_onehot(labels).to(device)
+        y = labels_to_text_embeddings(labels, device=device)
 
         recon, mu, logvar = model(x, y)
         loss, recon_loss, kl_loss = loss_function(recon, x, mu, logvar, beta=beta)
@@ -75,7 +79,7 @@ def evaluate(model, test_loader, device):
             labels = labels.to(device)
 
             x = flatten_images(images)
-            y = labels_to_onehot(labels).to(device)
+            y = labels_to_text_embeddings(labels, device=device)
 
             recon, mu, logvar = model(x, y)
             loss, recon_loss, kl_loss = loss_function(recon, x, mu, logvar, beta=1.0)
@@ -110,10 +114,10 @@ def visualize_samples(model, device, epoch, output_dir="outputs"):
     os.makedirs(output_dir, exist_ok=True)
 
     labels = torch.arange(0, 10, device=device)
-    labels_onehot = labels_to_onehot(labels).to(device)
+    text_embeddings = labels_to_text_embeddings(labels, device=device)
 
     with torch.no_grad():
-        generated = model.generate(labels_onehot, num_samples=1)
+        generated = model.generate(text_embeddings, num_samples=1)
 
     save_path = os.path.join(output_dir, f'pytorch_samples_epoch_{epoch}.png')
     visualize_training_samples(generated, labels, num_samples=10, save_path=save_path)

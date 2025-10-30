@@ -9,6 +9,8 @@ from typing import Tuple
 import sys
 sys.path.append('.')
 import config
+from src.utils.prompt_generator import generate_prompts_batch
+from src.model.text_encoder import encode_texts_batch
 
 
 def get_mnist_dataloaders(
@@ -39,15 +41,15 @@ def get_mnist_dataloaders(
 
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True,
-        num_workers=2, pin_memory=True
+        num_workers=0, pin_memory=True  # 0 workers to avoid fork issues with text encoder
     )
     val_loader = DataLoader(
         val_dataset, batch_size=batch_size, shuffle=False,
-        num_workers=2, pin_memory=True
+        num_workers=0, pin_memory=True
     )
     test_loader = DataLoader(
         test_dataset, batch_size=batch_size, shuffle=False,
-        num_workers=2, pin_memory=True
+        num_workers=0, pin_memory=True
     )
 
     return train_loader, val_loader, test_loader
@@ -64,3 +66,25 @@ def labels_to_onehot(labels: torch.Tensor, num_classes: int = 10) -> torch.Tenso
     onehot = torch.zeros(batch_size, num_classes, device=labels.device)
     onehot.scatter_(1, labels.unsqueeze(1), 1)
     return onehot
+
+
+def labels_to_text_embeddings(labels: torch.Tensor, device: str = 'cpu') -> torch.Tensor:
+    """Convert integer labels to text embeddings via natural language prompts.
+
+    Args:
+        labels: (batch_size,) tensor of integer labels (0-9)
+        device: Device to place embeddings on
+
+    Returns:
+        torch.Tensor: (batch_size, 384) text embeddings
+    """
+    # Convert labels to list of integers
+    labels_list = labels.cpu().tolist()
+
+    # Generate natural language prompts
+    prompts = generate_prompts_batch(labels_list)
+
+    # Encode prompts to embeddings
+    embeddings = encode_texts_batch(prompts, device=device)
+
+    return embeddings

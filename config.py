@@ -6,19 +6,20 @@ import torch
 LATENT_DIM = 20
 HIDDEN_DIM = 512
 INPUT_DIM = 784
-LABEL_DIM = 10
+TEXT_EMBEDDING_DIM = 384  # SentenceTransformer all-MiniLM-L6-v2 output dimension
+LABEL_DIM = TEXT_EMBEDDING_DIM  # For backward compatibility
 
-# Training
-BATCH_SIZE = 64
-LEARNING_RATE = 0.0003
-NUM_EPOCHS = 150
+# Training (adjusted for 384-dim text embeddings)
+BATCH_SIZE = 32  # Reduced: text encoding + larger model = more memory
+LEARNING_RATE = 0.0001  # Lower: more parameters need gentler updates
+NUM_EPOCHS = 200  # Increased: semantic learning takes longer to converge
 KL_WEIGHT = 0.1
 
 # Scheduling
-WARMUP_EPOCHS = 10
+WARMUP_EPOCHS = 15  # Longer warmup for stable text embedding learning
 MIN_LEARNING_RATE = 1e-6
 LR_SCHEDULE = "cosine_with_warmup"
-KL_WARMUP_EPOCHS = 20
+KL_WARMUP_EPOCHS = 30  # Longer KL warmup: larger embedding space needs time
 
 # Regularization
 WEIGHT_DECAY = 1e-5

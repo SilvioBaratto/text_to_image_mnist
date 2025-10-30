@@ -33,13 +33,14 @@ The animation shows how the VAE progressively learns to generate clearer, more r
 
 The model consists of three main components:
 
-#### 1. Text Parser
+#### 1. Semantic Text Encoder
 
-Extracts digit labels (0-9) from natural language input:
+Uses **SentenceTransformer** (all-MiniLM-L6-v2) to encode natural language prompts into 384-dimensional semantic embeddings:
 
-- Supports number words: "zero", "one", "two", ..., "nine"
-- Supports digit strings: "0", "1", "2", ..., "9"
-- Handles various phrasings: "Print 3", "Generate number five", "Show digit 8"
+- **No keyword parsing** - understands full sentence meaning
+- Supports diverse natural language: "I want to draw a zero", "Can you show me what five looks like?", "Generate the digit three"
+- Learns associations between text semantics and digit images
+- Pre-trained language model provides rich contextual understanding
 
 #### 2. Encoder Network (Convolutional)
 
@@ -83,6 +84,8 @@ Total Loss = Reconstruction Loss + KL Divergence
 - torchvision
 - NumPy
 - Matplotlib
+- sentence-transformers 5.1.2+ (for semantic text understanding)
+- tqdm (progress bars)
 
 ### Setup
 
@@ -112,28 +115,34 @@ python src/train.py
 **Training Details:**
 
 - Dataset: MNIST (60,000 training images)
-- Batch size: 128
-- Epochs: 20-30
-- Optimizer: Adam (lr=0.001)
-- Training time: ~10-20 minutes on CPU
+- Text prompts: 28 diverse templates automatically generated per digit
+- Batch size: 32 (adjusted for text encoding overhead)
+- Epochs: 200 (semantic learning requires more iterations)
+- Optimizer: Adam (lr=0.0001)
+- Training time: ~30-60 minutes on Apple Silicon GPU (MPS)
+- KL annealing: Gradual warmup over 30 epochs for stability
 
 Checkpoints are saved to `checkpoints/` every 5 epochs.
+
+**Note:** The first epoch will download the SentenceTransformer model (~80MB) once.
 
 ### Generating Images
 
 Generate digit images from text prompts:
 
 ```bash
-# Basic usage
-python main.py "Print number 3"
+# Natural language - semantic understanding!
+python main.py "I want to draw a zero"
+python main.py "Can you show me what five looks like?"
+python main.py "Please generate the digit three"
+python main.py "Draw a handwritten seven"
 
-# Various phrasings work
+# Simple forms also work
 python main.py "Generate digit 7"
 python main.py "Show me a five"
-python main.py "8"
 
 # Use specific checkpoint
-python main.py "Print number 2" --checkpoint checkpoints/model_epoch_25.pt
+python main.py "I want to draw a two" --checkpoint checkpoints/model_epoch_50.pt
 ```
 
 Generated images are saved to `outputs/` with timestamps.
@@ -146,19 +155,23 @@ Key hyperparameters in `config.py`:
 | --------------- | ----- | ----------------------- |
 | `latent_dim`    | 20    | Latent space dimensions |
 | `hidden_dim`    | 512   | Hidden layer size       |
-| `batch_size`    | 64    | Training batch size     |
-| `learning_rate` | 0.0003 | Adam optimizer LR      |
-| `epochs`        | 150   | Training epochs         |
+| `text_embedding_dim` | 384 | SentenceTransformer embedding size |
+| `batch_size`    | 32    | Training batch size (reduced for text encoding) |
+| `learning_rate` | 0.0001 | Adam optimizer LR (lower for stability) |
+| `epochs`        | 200   | Training epochs (more for semantic learning) |
+| `kl_warmup_epochs` | 30 | KL annealing warmup period |
 
 ## Technical Details
 
-### Conditional Generation
+### Conditional Generation with Semantic Text Understanding
 
-The model conditions both the encoder and decoder on digit labels via one-hot encoding. This allows the VAE to:
+The model conditions both the encoder and decoder on **384-dimensional text embeddings** from SentenceTransformer. This allows the VAE to:
 
-- Learn digit-specific latent representations
-- Generate specific digits on demand
-- Maintain clear separation between digit classes in latent space
+- **Understand semantic meaning** of natural language prompts (not just keywords)
+- Learn associations between text semantics and visual digit representations
+- Generate specific digits from diverse phrasings
+- Leverage pre-trained language understanding for richer conditioning
+- Support creative and varied prompt formulations
 
 ### Reparameterization Trick
 

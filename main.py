@@ -7,27 +7,29 @@ import torch
 import sys
 sys.path.append('.')
 
+# Fix tokenizer multiprocessing warning
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
 import config
 from src.model.vae import CVAE
-from src.model.text_encoder import parse_text_to_digit
-from src.utils.data_loader import labels_to_onehot
+from src.model.text_encoder import encode_text_to_embedding
 from src.utils.image_utils import save_generated_image, display_image_in_terminal
 
 
 def generate_from_text(text_prompt: str, model: CVAE, device: torch.device, num_samples: int = 1):
-    """Generate digit images from natural language prompt."""
-    digit = parse_text_to_digit(text_prompt)
-    print(f"Parsed digit: {digit}")
+    """Generate digit images from natural language prompt using semantic understanding."""
+    print(f"Encoding prompt: '{text_prompt}'")
 
-    label = torch.tensor([digit], dtype=torch.long, device=device)
-    label_onehot = labels_to_onehot(label).to(device)
+    # Encode full prompt to 384-dim embedding (semantic understanding!)
+    text_embedding = encode_text_to_embedding(text_prompt, device=str(device))
+    text_embedding = text_embedding.unsqueeze(0)  # Add batch dimension: (384) -> (1, 384)
 
     model.eval()
     with torch.no_grad():
-        generated_flat = model.generate(label_onehot, num_samples=num_samples)
+        generated_flat = model.generate(text_embedding, num_samples=num_samples)
         generated = generated_flat.view(num_samples, 1, 28, 28)
 
-    return generated, digit
+    return generated
 
 
 def main():
@@ -72,16 +74,24 @@ def main():
     print(f"Loaded model from epoch {checkpoint['epoch']}")
 
     print(f"\nGenerating from prompt: '{args.prompt}'")
-    generated_images, digit = generate_from_text(args.prompt, model, device, args.num_samples)
+    generated_images = generate_from_text(args.prompt, model, device, args.num_samples)
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    for img in generated_images:
-        filepath = save_generated_image(img, digit, output_dir=args.output_dir)
+    # Save with timestamp-based naming (no digit parsing needed!)
+    for i, img in enumerate(generated_images):
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"generated_sample_{i}_{timestamp}.png"
+        filepath = os.path.join(args.output_dir, filename)
+
+        # Save using matplotlib
+        import matplotlib.pyplot as plt
+        plt.imsave(filepath, img.squeeze().cpu().numpy(), cmap='gray')
         print(f"Saved: {filepath}")
 
     if not args.no_display:
-        display_image_in_terminal(generated_images[0], digit)
+        display_image_in_terminal(generated_images[0])
 
     print("Generation complete!")
 
