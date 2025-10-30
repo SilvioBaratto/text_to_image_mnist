@@ -14,7 +14,7 @@ import config
 from src.model.vae import CVAE
 from src.model.text_encoder import parse_text_to_digit
 from src.utils.data_loader import labels_to_onehot
-from src.utils.image_utils import save_generated_image
+from src.utils.image_utils import save_generated_image, display_image_in_terminal
 
 
 def generate_from_text(text_prompt: str, model: CVAE, device: torch.device, num_samples: int = 1):
@@ -58,6 +58,8 @@ def main():
                         help="Number of samples to generate (default: 1)")
     parser.add_argument("--output-dir", type=str, default="outputs",
                         help="Output directory for generated images")
+    parser.add_argument("--no-display", action="store_true",
+                        help="Don't display image in terminal (default: display)")
 
     args = parser.parse_args()
 
@@ -106,7 +108,12 @@ def main():
         filepath = save_generated_image(img, digit, output_dir=args.output_dir)
         print(f"Saved: {filepath}")
 
-    print("\nGeneration complete!")
+    # Display in terminal (unless disabled)
+    if not args.no_display:
+        # Display the first generated image
+        display_image_in_terminal(generated_images[0], digit)
+
+    print("Generation complete!")
 
 
 if __name__ == "__main__":

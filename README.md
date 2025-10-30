@@ -17,6 +17,16 @@ python main.py "Print number 5"
 # Generates: outputs/generated_5_20250130_143022.png
 ```
 
+## Training Progression
+
+Watch the model learn to generate all 10 digits during training:
+
+<p align="center">
+  <img src="training_progression.gif" alt="Training Progression" width="800"/>
+</p>
+
+The animation shows how the VAE progressively learns to generate clearer, more recognizable digits from random noise as training progresses through the epochs.
+
 ## Model Architecture
 
 ### Conditional VAE (CVAE)

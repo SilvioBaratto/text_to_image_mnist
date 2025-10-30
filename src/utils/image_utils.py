@@ -131,3 +131,56 @@ def unflatten_image(image: torch.Tensor) -> torch.Tensor:
         return image.view(-1, 1, 28, 28)
     else:
         raise ValueError(f"Expected 1D or 2D tensor, got shape {image.shape}")
+
+
+def display_image_in_terminal(image: torch.Tensor, digit: int) -> None:
+    """
+    Display generated MNIST image as ASCII art in terminal using Unicode blocks.
+
+    Args:
+        image: Generated image tensor of shape (784,) or (1, 28, 28)
+        digit: The digit label (0-9)
+    """
+    # Convert tensor to numpy array and reshape to 28x28
+    if image.dim() == 1:
+        # Flatten format (784,)
+        image_np = image.cpu().detach().numpy().reshape(28, 28)
+    elif image.dim() == 3:
+        # Image format (1, 28, 28)
+        image_np = image.cpu().detach().numpy().squeeze()
+    else:
+        raise ValueError(f"Expected image shape (784,) or (1, 28, 28), got {image.shape}")
+
+    # Unicode block characters for smoother gradients (light to dark)
+    # Using more levels for better detail
+    block_chars = " ░░▒▒▓▓██"
+
+    # Normalize and enhance contrast slightly
+    image_np = np.clip(image_np, 0, 1)
+
+    # Apply slight gamma correction for better visibility (makes mid-tones brighter)
+    image_np = np.power(image_np, 0.7)
+
+    # Convert to blocks
+    print(f"\n{'='*80}")
+    print(f"{'Generated Digit: ' + str(digit):^80}")
+    print(f"{'='*80}\n")
+
+    # Process pairs of rows for better aspect ratio
+    for i in range(0, 28, 2):
+        line = "    "  # Left padding for centering
+        for j in range(28):
+            # Average two vertical pixels for better aspect ratio
+            if i + 1 < 28:
+                pixel = (image_np[i, j] + image_np[i+1, j]) / 2
+            else:
+                pixel = image_np[i, j]
+
+            # Map to block character with better rounding
+            char_idx = min(int(pixel * len(block_chars)), len(block_chars) - 1)
+
+            # Double each character for better width ratio
+            line += block_chars[char_idx] * 2
+        print(line)
+
+    print(f"\n{'='*80}\n")

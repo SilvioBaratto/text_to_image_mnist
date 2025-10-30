@@ -86,9 +86,11 @@ Thumbs.db
 # Training artifacts
 training_curves.png
 training_losses.csv
-training_progression.gif
 *.gif
 *.mp4
+
+# Exception: Allow training_progression.gif for README display
+!training_progression.gif
 
 # Temporary files
 *.tmp
