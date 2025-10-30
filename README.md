@@ -35,10 +35,10 @@ Extracts digit labels (0-9) from natural language input:
 
 Maps images and labels to a latent distribution:
 
-- **Input**: 784 pixels (28�28 flattened) + 10 (one-hot label) = 794 dimensions
+- **Input**: 784 pixels (28×28 flattened) + 10 (one-hot label) = 794 dimensions
 - **Hidden Layer**: 400 units with ReLU activation
-- **Output**: 20-dimensional latent space (mean � and log variance log ò)
-- **Reparameterization Trick**: z = � + � � �, where � ~ N(0,1)
+- **Output**: 20-dimensional latent space (mean μ and log variance log σ²)
+- **Reparameterization Trick**: z = μ + σ × ε, where ε ~ N(0,1)
 
 #### 3. Decoder Network
 
@@ -46,7 +46,7 @@ Reconstructs images from latent codes and labels:
 
 - **Input**: 20 (latent vector) + 10 (one-hot label) = 30 dimensions
 - **Hidden Layer**: 400 units with ReLU activation
-- **Output**: 784 pixels with sigmoid activation (28�28 image)
+- **Output**: 784 pixels with sigmoid activation (28×28 image)
 
 ### Loss Function
 
