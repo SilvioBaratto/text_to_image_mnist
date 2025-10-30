@@ -1,7 +1,4 @@
-"""
-Image saving and visualization utilities.
-Handles saving generated MNIST images and displaying them.
-"""
+"""Image saving and terminal visualization utilities."""
 
 import os
 import matplotlib.pyplot as plt
@@ -21,37 +18,19 @@ def save_generated_image(
     output_dir: str = config.OUTPUT_DIR,
     show: bool = False
 ) -> str:
-    """
-    Save generated MNIST image to file.
-
-    Args:
-        image: Generated image tensor of shape (784,) or (1, 28, 28)
-        digit: The digit label (0-9)
-        output_dir: Directory to save images
-        show: Whether to display the image (default: False)
-
-    Returns:
-        filepath: Path to saved image file
-    """
-    # Create output directory if it doesn't exist
+    """Save generated digit image to file."""
     os.makedirs(output_dir, exist_ok=True)
 
-    # Convert tensor to numpy array and reshape to 28x28
     if image.dim() == 1:
-        # Flatten format (784,)
         image_np = image.cpu().detach().numpy().reshape(28, 28)
     elif image.dim() == 3:
-        # Image format (1, 28, 28)
         image_np = image.cpu().detach().numpy().squeeze()
     else:
-        raise ValueError(f"Expected image shape (784,) or (1, 28, 28), got {image.shape}")
+        raise ValueError(f"Expected shape (784,) or (1, 28, 28), got {image.shape}")
 
-    # Generate timestamp for unique filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"generated_{digit}_{timestamp}.png"
-    filepath = os.path.join(output_dir, filename)
+    filepath = os.path.join(output_dir, f"generated_{digit}_{timestamp}.png")
 
-    # Create figure and save
     plt.figure(figsize=(3, 3))
     plt.imshow(image_np, cmap='gray')
     plt.axis('off')
@@ -73,32 +52,19 @@ def visualize_training_samples(
     num_samples: int = 10,
     save_path: Optional[str] = None
 ) -> None:
-    """
-    Visualize a grid of training/generated samples.
-
-    Args:
-        images: Batch of images with shape (batch_size, 784) or (batch_size, 1, 28, 28)
-        labels: Integer labels with shape (batch_size,)
-        num_samples: Number of samples to display (default: 10)
-        save_path: Optional path to save the visualization
-    """
-    # Limit to available samples
+    """Create a grid of sample images with labels."""
     num_samples = min(num_samples, images.size(0))
 
-    # Convert to numpy
     if images.dim() == 2:
-        # Flatten format (batch_size, 784)
         images_np = images.cpu().detach().numpy().reshape(-1, 28, 28)
     elif images.dim() == 4:
-        # Image format (batch_size, 1, 28, 28)
         images_np = images.cpu().detach().numpy().squeeze(1)
     else:
-        raise ValueError(f"Expected image shape (batch, 784) or (batch, 1, 28, 28), got {images.shape}")
+        raise ValueError(f"Expected shape (batch, 784) or (batch, 1, 28, 28), got {images.shape}")
 
     labels_np = labels.cpu().detach().numpy()
 
-    # Create grid
-    fig, axes = plt.subplots(2, 5, figsize=(10, 4))
+    _, axes = plt.subplots(2, 5, figsize=(10, 4))
     axes = axes.flatten()
 
     for i in range(num_samples):
@@ -116,70 +82,37 @@ def visualize_training_samples(
 
 
 def unflatten_image(image: torch.Tensor) -> torch.Tensor:
-    """
-    Convert flattened image (784,) to 2D image (1, 28, 28).
-
-    Args:
-        image: Flattened image tensor of shape (784,) or (batch, 784)
-
-    Returns:
-        unflattened: Image tensor of shape (1, 28, 28) or (batch, 1, 28, 28)
-    """
+    """Convert (784,) to (1, 28, 28) or (batch, 784) to (batch, 1, 28, 28)."""
     if image.dim() == 1:
         return image.view(1, 28, 28)
     elif image.dim() == 2:
         return image.view(-1, 1, 28, 28)
     else:
-        raise ValueError(f"Expected 1D or 2D tensor, got shape {image.shape}")
+        raise ValueError(f"Expected 1D or 2D tensor, got {image.shape}")
 
 
 def display_image_in_terminal(image: torch.Tensor, digit: int) -> None:
-    """
-    Display generated MNIST image as ASCII art in terminal using Unicode blocks.
-
-    Args:
-        image: Generated image tensor of shape (784,) or (1, 28, 28)
-        digit: The digit label (0-9)
-    """
-    # Convert tensor to numpy array and reshape to 28x28
+    """Render generated digit as Unicode block art in terminal."""
     if image.dim() == 1:
-        # Flatten format (784,)
         image_np = image.cpu().detach().numpy().reshape(28, 28)
     elif image.dim() == 3:
-        # Image format (1, 28, 28)
         image_np = image.cpu().detach().numpy().squeeze()
     else:
-        raise ValueError(f"Expected image shape (784,) or (1, 28, 28), got {image.shape}")
+        raise ValueError(f"Expected shape (784,) or (1, 28, 28), got {image.shape}")
 
-    # Unicode block characters for smoother gradients (light to dark)
-    # Using more levels for better detail
     block_chars = " ░░▒▒▓▓██"
-
-    # Normalize and enhance contrast slightly
     image_np = np.clip(image_np, 0, 1)
-
-    # Apply slight gamma correction for better visibility (makes mid-tones brighter)
     image_np = np.power(image_np, 0.7)
 
-    # Convert to blocks
     print(f"\n{'='*80}")
     print(f"{'Generated Digit: ' + str(digit):^80}")
     print(f"{'='*80}\n")
 
-    # Process pairs of rows for better aspect ratio
     for i in range(0, 28, 2):
-        line = "    "  # Left padding for centering
+        line = "    "
         for j in range(28):
-            # Average two vertical pixels for better aspect ratio
-            if i + 1 < 28:
-                pixel = (image_np[i, j] + image_np[i+1, j]) / 2
-            else:
-                pixel = image_np[i, j]
-
-            # Map to block character with better rounding
+            pixel = (image_np[i, j] + image_np[i+1, j]) / 2 if i + 1 < 28 else image_np[i, j]
             char_idx = min(int(pixel * len(block_chars)), len(block_chars) - 1)
-
-            # Double each character for better width ratio
             line += block_chars[char_idx] * 2
         print(line)
 

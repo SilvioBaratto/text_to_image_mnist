@@ -1,7 +1,4 @@
-"""
-CLI for generating MNIST digits from text prompts using PyTorch CVAE.
-Usage: python main_pytorch.py "Print number 5"
-"""
+"""Text-to-image generation for MNIST digits using CVAE."""
 
 import os
 import argparse
@@ -18,32 +15,16 @@ from src.utils.image_utils import save_generated_image, display_image_in_termina
 
 
 def generate_from_text(text_prompt: str, model: CVAE, device: torch.device, num_samples: int = 1):
-    """
-    Generate digit image from text prompt.
-
-    Args:
-        text_prompt: Text description (e.g., "Print number 5")
-        model: Trained CVAE model
-        device: Device to run on
-        num_samples: Number of samples to generate
-
-    Returns:
-        generated: Generated images (num_samples, 1, 28, 28)
-        digit: The parsed digit label
-    """
-    # Parse text to digit
+    """Generate digit images from natural language prompt."""
     digit = parse_text_to_digit(text_prompt)
     print(f"Parsed digit: {digit}")
 
-    # Create one-hot label
     label = torch.tensor([digit], dtype=torch.long, device=device)
     label_onehot = labels_to_onehot(label).to(device)
 
-    # Generate
     model.eval()
     with torch.no_grad():
         generated_flat = model.generate(label_onehot, num_samples=num_samples)
-        # Reshape to image format
         generated = generated_flat.view(num_samples, 1, 28, 28)
 
     return generated, digit
@@ -63,15 +44,10 @@ def main():
 
     args = parser.parse_args()
 
-    # Setup device
     device = config.DEVICE
     print(f"Device: {device}")
 
-    # Determine checkpoint path
-    if args.checkpoint is None:
-        checkpoint_path = os.path.join(config.CHECKPOINT_DIR, "best_model_pytorch.pt")
-    else:
-        checkpoint_path = args.checkpoint
+    checkpoint_path = args.checkpoint or os.path.join(config.CHECKPOINT_DIR, "best_model_pytorch.pt")
 
     if not os.path.exists(checkpoint_path):
         print(f"Error: Checkpoint not found: {checkpoint_path}")
@@ -84,7 +60,6 @@ def main():
 
     print(f"Loading checkpoint: {checkpoint_path}")
 
-    # Initialize model
     model = CVAE(
         input_dim=config.INPUT_DIM,
         label_dim=config.LABEL_DIM,
@@ -92,25 +67,20 @@ def main():
         latent_dim=config.LATENT_DIM
     ).to(device)
 
-    # Load checkpoint
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint['model_state_dict'])
     print(f"Loaded model from epoch {checkpoint['epoch']}")
 
-    # Generate image
     print(f"\nGenerating from prompt: '{args.prompt}'")
     generated_images, digit = generate_from_text(args.prompt, model, device, args.num_samples)
 
-    # Save images
     os.makedirs(args.output_dir, exist_ok=True)
 
     for img in generated_images:
         filepath = save_generated_image(img, digit, output_dir=args.output_dir)
         print(f"Saved: {filepath}")
 
-    # Display in terminal (unless disabled)
     if not args.no_display:
-        # Display the first generated image
         display_image_in_terminal(generated_images[0], digit)
 
     print("Generation complete!")
