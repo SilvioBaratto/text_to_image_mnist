@@ -1,0 +1,113 @@
+"""
+CLI for generating MNIST digits from text prompts using PyTorch CVAE.
+Usage: python main_pytorch.py "Print number 5"
+"""
+
+import os
+import argparse
+import torch
+
+import sys
+sys.path.append('.')
+
+import config
+from src.model.vae import CVAE
+from src.model.text_encoder import parse_text_to_digit
+from src.utils.data_loader import labels_to_onehot
+from src.utils.image_utils import save_generated_image
+
+
+def generate_from_text(text_prompt: str, model: CVAE, device: torch.device, num_samples: int = 1):
+    """
+    Generate digit image from text prompt.
+
+    Args:
+        text_prompt: Text description (e.g., "Print number 5")
+        model: Trained CVAE model
+        device: Device to run on
+        num_samples: Number of samples to generate
+
+    Returns:
+        generated: Generated images (num_samples, 1, 28, 28)
+        digit: The parsed digit label
+    """
+    # Parse text to digit
+    digit = parse_text_to_digit(text_prompt)
+    print(f"Parsed digit: {digit}")
+
+    # Create one-hot label
+    label = torch.tensor([digit], dtype=torch.long, device=device)
+    label_onehot = labels_to_onehot(label).to(device)
+
+    # Generate
+    model.eval()
+    with torch.no_grad():
+        generated_flat = model.generate(label_onehot, num_samples=num_samples)
+        # Reshape to image format
+        generated = generated_flat.view(num_samples, 1, 28, 28)
+
+    return generated, digit
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate MNIST digits from text prompts")
+    parser.add_argument("prompt", type=str, help="Text prompt (e.g., 'Print number 5')")
+    parser.add_argument("--checkpoint", type=str, default=None,
+                        help="Path to model checkpoint (default: best_model_pytorch.pt)")
+    parser.add_argument("--num-samples", type=int, default=1,
+                        help="Number of samples to generate (default: 1)")
+    parser.add_argument("--output-dir", type=str, default="outputs",
+                        help="Output directory for generated images")
+
+    args = parser.parse_args()
+
+    # Setup device
+    device = config.DEVICE
+    print(f"Device: {device}")
+
+    # Determine checkpoint path
+    if args.checkpoint is None:
+        checkpoint_path = os.path.join(config.CHECKPOINT_DIR, "best_model_pytorch.pt")
+    else:
+        checkpoint_path = args.checkpoint
+
+    if not os.path.exists(checkpoint_path):
+        print(f"Error: Checkpoint not found: {checkpoint_path}")
+        print("\nAvailable checkpoints:")
+        if os.path.exists(config.CHECKPOINT_DIR):
+            checkpoints = [f for f in os.listdir(config.CHECKPOINT_DIR) if f.endswith('.pt')]
+            for ckpt in sorted(checkpoints):
+                print(f"  - {ckpt}")
+        return
+
+    print(f"Loading checkpoint: {checkpoint_path}")
+
+    # Initialize model
+    model = CVAE(
+        input_dim=config.INPUT_DIM,
+        label_dim=config.LABEL_DIM,
+        hidden_dim=config.HIDDEN_DIM,
+        latent_dim=config.LATENT_DIM
+    ).to(device)
+
+    # Load checkpoint
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    print(f"Loaded model from epoch {checkpoint['epoch']}")
+
+    # Generate image
+    print(f"\nGenerating from prompt: '{args.prompt}'")
+    generated_images, digit = generate_from_text(args.prompt, model, device, args.num_samples)
+
+    # Save images
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    for img in generated_images:
+        filepath = save_generated_image(img, digit, output_dir=args.output_dir)
+        print(f"Saved: {filepath}")
+
+    print("\nGeneration complete!")
+
+
+if __name__ == "__main__":
+    main()
