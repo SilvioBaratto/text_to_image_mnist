@@ -41,22 +41,27 @@ Extracts digit labels (0-9) from natural language input:
 - Supports digit strings: "0", "1", "2", ..., "9"
 - Handles various phrasings: "Print 3", "Generate number five", "Show digit 8"
 
-#### 2. Encoder Network
+#### 2. Encoder Network (Convolutional)
 
-Maps images and labels to a latent distribution:
+Maps images and labels to a latent distribution using convolutional layers:
 
-- **Input**: 784 pixels (28×28 flattened) + 10 (one-hot label) = 794 dimensions
-- **Hidden Layer**: 400 units with ReLU activation
+- **Input**: 28×28 grayscale image (reshaped from 784-dim vector)
+- **Conv Layer 1**: 32 filters (3×3, stride=2) → 32×14×14 feature maps
+- **Conv Layer 2**: 64 filters (3×3, stride=2) → 64×7×7 feature maps
+- **Flatten + Concat**: 3136 features + 10 (one-hot label) = 3146 dimensions
+- **Hidden Layer**: 512 units with ReLU activation
 - **Output**: 20-dimensional latent space (mean μ and log variance log σ²)
 - **Reparameterization Trick**: z = μ + σ × ε, where ε ~ N(0,1)
 
-#### 3. Decoder Network
+#### 3. Decoder Network (Transposed Convolutions)
 
-Reconstructs images from latent codes and labels:
+Reconstructs images from latent codes and labels using deconvolution:
 
 - **Input**: 20 (latent vector) + 10 (one-hot label) = 30 dimensions
-- **Hidden Layer**: 400 units with ReLU activation
-- **Output**: 784 pixels with sigmoid activation (28×28 image)
+- **Hidden Layers**: 512 units → 3136 units (reshaped to 64×7×7)
+- **Deconv Layer 1**: 64→32 filters (3×3, stride=2) → 32×14×14
+- **Deconv Layer 2**: 32→1 filter (3×3, stride=2) → 1×28×28
+- **Output**: 784 pixels with sigmoid activation (flattened 28×28 image)
 
 ### Loss Function
 
@@ -140,10 +145,10 @@ Key hyperparameters in `config.py`:
 | Parameter       | Value | Description             |
 | --------------- | ----- | ----------------------- |
 | `latent_dim`    | 20    | Latent space dimensions |
-| `hidden_dim`    | 400   | Hidden layer size       |
-| `batch_size`    | 128   | Training batch size     |
-| `learning_rate` | 0.001 | Adam optimizer LR       |
-| `epochs`        | 30    | Training epochs         |
+| `hidden_dim`    | 512   | Hidden layer size       |
+| `batch_size`    | 64    | Training batch size     |
+| `learning_rate` | 0.0003 | Adam optimizer LR      |
+| `epochs`        | 150   | Training epochs         |
 
 ## Technical Details
 

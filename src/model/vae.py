@@ -11,7 +11,7 @@ import config
 
 
 class Encoder(nn.Module):
-    """Maps image+label pairs to latent distribution parameters (μ, log σ²)."""
+    """Convolutional encoder: maps image+label pairs to latent distribution parameters (μ, log σ²)."""
 
     def __init__(
         self,
@@ -21,20 +21,41 @@ class Encoder(nn.Module):
         latent_dim: int = config.LATENT_DIM
     ):
         super().__init__()
-        combined_dim = input_dim + label_dim
 
+        # Convolutional layers for spatial feature extraction
+        # 28x28 -> 14x14 -> 7x7
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, stride=2, padding=1)  # 28->14
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)  # 14->7
+
+        # After conv layers: 64 channels * 7 * 7 = 3136 features
+        conv_output_dim = 64 * 7 * 7
+        combined_dim = conv_output_dim + label_dim
+
+        # Fully connected layers for latent parameters
         self.fc1 = nn.Linear(combined_dim, hidden_dim)
         self.fc_mu = nn.Linear(hidden_dim, latent_dim)
         self.fc_logvar = nn.Linear(hidden_dim, latent_dim)
 
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        combined = torch.cat([x, y], dim=1)
+        # Reshape flattened input to 2D spatial: (batch, 784) -> (batch, 1, 28, 28)
+        batch_size = x.size(0)
+        x = x.view(batch_size, 1, 28, 28)
+
+        # Convolutional feature extraction
+        h = F.relu(self.conv1(x))  # (batch, 32, 14, 14)
+        h = F.relu(self.conv2(h))  # (batch, 64, 7, 7)
+
+        # Flatten conv features and concatenate with label
+        h = h.view(batch_size, -1)  # (batch, 3136)
+        combined = torch.cat([h, y], dim=1)  # (batch, 3136 + 10)
+
+        # Latent parameters
         h = F.relu(self.fc1(combined))
         return self.fc_mu(h), self.fc_logvar(h)
 
 
 class Decoder(nn.Module):
-    """Reconstructs images from latent codes and labels."""
+    """Convolutional decoder: reconstructs images from latent codes and labels."""
 
     def __init__(
         self,
@@ -46,13 +67,33 @@ class Decoder(nn.Module):
         super().__init__()
         combined_dim = latent_dim + label_dim
 
+        # Fully connected layers to expand latent code
         self.fc1 = nn.Linear(combined_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, output_dim)
+        self.fc2 = nn.Linear(hidden_dim, 64 * 7 * 7)  # Prepare for reshape to (64, 7, 7)
+
+        # Transposed convolutional layers for spatial reconstruction
+        # 7x7 -> 14x14 -> 28x28
+        self.deconv1 = nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1)  # 7->14
+        self.deconv2 = nn.ConvTranspose2d(32, 1, kernel_size=3, stride=2, padding=1, output_padding=1)   # 14->28
 
     def forward(self, z: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        # Combine latent and label
         combined = torch.cat([z, y], dim=1)
+
+        # Expand through fully connected layers
         h = F.relu(self.fc1(combined))
-        return torch.sigmoid(self.fc2(h))
+        h = F.relu(self.fc2(h))
+
+        # Reshape to spatial: (batch, 3136) -> (batch, 64, 7, 7)
+        batch_size = h.size(0)
+        h = h.view(batch_size, 64, 7, 7)
+
+        # Transposed convolutions for upsampling
+        h = F.relu(self.deconv1(h))  # (batch, 32, 14, 14)
+        h = torch.sigmoid(self.deconv2(h))  # (batch, 1, 28, 28)
+
+        # Flatten back to match expected output: (batch, 1, 28, 28) -> (batch, 784)
+        return h.view(batch_size, -1)
 
 
 class CVAE(nn.Module):
